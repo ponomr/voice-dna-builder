@@ -68,11 +68,11 @@ not no do does did have has had will would can could should may might must just 
 
 # Формы анти-слоя (см. references/universal-anti-slop.md).
 COPULAR_ANTITHESIS_RE = re.compile(
-    r"(?<!\w)это\s+не\s+(?:просто\s+)?[^.!?…\n]{1,60}?"
+    r"(?<!\w)это\s+(?:(?:совсем|вовсе|отнюдь)\s+)?не\s+(?:просто\s+)?[^.!?…\n]{1,60}?"
     r"(?:,\s*а(?!\w)|\s*[,—–-]\s*это(?!\w)|[.!?…]\s+это(?!\w))"
-    r"|[—–]\s*(?:это\s+)?не\s+[^.!?…\n—–]{1,60}?,\s*а(?!\w)"
-    r"|(?<!\w)(?:isn['’]t|is\s+not|['’]s\s+not)\s+(?:just\s+)?[^.!?…\n]{1,60}?"
-    r"(?:\s*[,—–-]\s*|[.!?…]\s+)(?:it['’]s|it\s+is|this\s+is|that['’]s)(?!\w)",
+    r"|(?:[—–]|(?<=\w )-)\s*(?:это\s+)?(?:(?:совсем|вовсе|отнюдь)\s+)?не\s+[^.!?…\n—–]{1,60}?,\s*а(?!\w)"
+    r"|(?:(?<!\w)(?:isn['’]t|is\s+not)|['’]s\s+not)\s+(?!only(?!\w))(?:just\s+)?[^.!?…\n]{1,60}?"
+    r"(?:(?:\s*[,—–-]\s*|[.!?…]\s+)(?:it['’]s|it\s+is|this\s+is|that['’]s)(?!\w)|,?\s+but(?!\w))",
     re.IGNORECASE,
 )
 GENERAL_ANTITHESIS_RE = re.compile(
@@ -80,7 +80,7 @@ GENERAL_ANTITHESIS_RE = re.compile(
     r"|(?<!\w)меньше\s+[^.!?…\n]{1,40}?,\s*больше(?!\w)"
     r"|(?<!\w)не\s+потому\s*,?\s+что\s+[^!?\n]{1,80}?(?<!\w)а\s+потому(?!\w)"
     r"|(?<!\w)забудь(?:те)?\s+[^.!?…\n]{1,40}[.!?…]\s+это(?!\w)"
-    r"|(?<!\w)not\s+(?!only(?!\w))[^,.!?…\n]{1,60}?,?\s+but(?!\w)"
+    r"|(?<!\w)(?<!\w\s)not\s+(?!only(?!\w))[^,.!?…\n]{1,60}?,?\s+but(?!\w)"
     r"|(?<!\w)less\s+[^.!?…\n]{1,40}?,\s*more(?!\w)"
     r"|(?<!\w)not\s+because\s+[^!?\n]{1,80}?(?<!\w)but\s+because(?!\w)"
     r"|(?<!\w)forget\s+[^.!?…\n]{1,40}[.!?…]\s+this\s+is(?!\w)",
@@ -193,15 +193,15 @@ def classify_ending(sample):
 
 
 def anti_slop_forms(samples):
-    """Для каждой формы анти-слоя: число образцов с ней и до трёх примеров."""
+    """Для каждой формы анти-слоя: число образцов с ней и до трёх примеров из разных образцов."""
     forms = {name: [0, []] for name in (COPULAR_FORM, *SOFTENING_THRESHOLD_PERCENT)}
 
     def record(name, sample, regex):
-        matches =[" ".join(sample[max(0, m.start() - 30):m.end() + 30].split())
-                   for m in regex.finditer(sample)]
-        if matches:
+        match = regex.search(sample)
+        if match:
             forms[name][0] += 1
-            forms[name][1].extend(matches[:3 - len(forms[name][1])])
+            if len(forms[name][1]) < 3:
+                forms[name][1].append(" ".join(sample[max(0, match.start() - 30):match.end() + 30].split()))
 
     for s in samples:
         record(COPULAR_FORM, s, COPULAR_ANTITHESIS_RE)
