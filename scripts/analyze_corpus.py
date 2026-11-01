@@ -66,6 +66,40 @@ these those it its as by from he she they we you i me my your our their his her 
 not no do does did have has had will would can could should may might must just so
 """.split())
 
+# Формы анти-слоя (см. references/universal-anti-slop.md).
+COPULAR_ANTITHESIS_RE = re.compile(
+    r"(?<!\w)это\s+(?:(?:совсем|вовсе|отнюдь)\s+)?не\s+(?:просто\s+)?[^.!?…\n]{1,60}?"
+    r"(?:,\s*а(?!\w)|\s*[,—–-]\s*это(?!\w)|[.!?…]\s+это(?!\w))"
+    r"|(?:[—–]|(?<=\w )-)\s*(?:это\s+)?(?:(?:совсем|вовсе|отнюдь)\s+)?не\s+[^.!?…\n—–]{1,60}?,\s*а(?!\w)"
+    r"|(?:(?<!\w)(?:isn['’]t|is\s+not)|['’]s\s+not)\s+(?!only(?!\w))(?:just\s+)?[^.!?…\n]{1,60}?"
+    r"(?:(?:\s*[,—–-]\s*|[.!?…]\s+)(?:it['’]s|it\s+is|this\s+is|that['’]s)(?!\w)|,?\s+but(?!\w))",
+    re.IGNORECASE,
+)
+GENERAL_ANTITHESIS_RE = re.compile(
+    r"(?<!\w)не\s+[^,.!?…\n]{1,60}?,\s*а(?!\w)"
+    r"|(?<!\w)меньше\s+[^.!?…\n]{1,40}?,\s*больше(?!\w)"
+    r"|(?<!\w)не\s+потому\s*,?\s+что\s+[^!?\n]{1,80}?(?<!\w)а\s+потому(?!\w)"
+    r"|(?<!\w)забудь(?:те)?\s+[^.!?…\n]{1,40}[.!?…]\s+это(?!\w)"
+    r"|(?<!\w)(?<!\w\s)not\s+(?!only(?!\w))[^,.!?…\n]{1,60}?,?\s+but(?!\w)"
+    r"|(?<!\w)less\s+[^.!?…\n]{1,40}?,\s*more(?!\w)"
+    r"|(?<!\w)not\s+because\s+[^!?\n]{1,80}?(?<!\w)but\s+because(?!\w)"
+    r"|(?<!\w)forget\s+[^.!?…\n]{1,40}[.!?…]\s+this\s+is(?!\w)",
+    re.IGNORECASE,
+)
+ARROW_RE = re.compile(r"[→⟶➡]|->|=>")
+PASSIVE_RE = re.compile(
+    r"(?<!\w)(?:был[оаи]?|будет|будут)\s+\w+(?:ан|ен|ят|т)[оаы]?(?!\w)"
+    r"|(?<!\w)(?:отмечается|считается|предполагается|ожидается|рассматривается|"
+    r"сообщается|указывается|наблюдается)(?!\w)"
+    r"|(?<!\w)(?:is|are|was|were|been|being|be)\s+(?:\w+ly\s+)?\w+ed(?!\w)",
+    re.IGNORECASE,
+)
+
+COPULAR_FORM = "связочная антитеза"
+SOFTENING_THRESHOLD_PERCENT = {"общая антитеза": 10, "стрелки": 30, "пассив": None}
+MIN_SAMPLES_WITH_FORM = 2
+MIN_CORPUS_FOR_SOFTENING = 5
+
 
 def read_input(path):
     if path == "-":
@@ -158,6 +192,36 @@ def classify_ending(sample):
     return "без знака"
 
 
+def anti_slop_forms(samples):
+    """Для каждой формы анти-слоя: число образцов с ней и до трёх примеров из разных образцов."""
+    forms = {name: [0, []] for name in (COPULAR_FORM, *SOFTENING_THRESHOLD_PERCENT)}
+
+    def record(name, sample, regex):
+        match = regex.search(sample)
+        if match:
+            forms[name][0] += 1
+            if len(forms[name][1]) < 3:
+                forms[name][1].append(" ".join(sample[max(0, match.start() - 30):match.end() + 30].split()))
+
+    for s in samples:
+        record(COPULAR_FORM, s, COPULAR_ANTITHESIS_RE)
+        without_copular = COPULAR_ANTITHESIS_RE.sub(" ", s)
+        record("общая антитеза", without_copular, GENERAL_ANTITHESIS_RE)
+        record("стрелки", s, ARROW_RE)
+        record("пассив", s, PASSIVE_RE)
+    return forms
+
+
+def should_soften(name, count, total_samples):
+    threshold = SOFTENING_THRESHOLD_PERCENT.get(name)
+    return (
+        threshold is not None
+        and total_samples >= MIN_CORPUS_FOR_SOFTENING
+        and count >= MIN_SAMPLES_WITH_FORM
+        and 100.0 * count / total_samples >= threshold
+    )
+
+
 def main():
     if len(sys.argv) < 2:
         print("usage: analyze_corpus.py <file|->", file=sys.stderr)
@@ -209,6 +273,8 @@ def main():
     exclaim = joined.count("!")
     question = joined.count("?")
     contractions = len(re.findall(r"\b\w+['’]\w+\b", joined))
+
+    forms = anti_slop_forms(samples)
 
     out = []
     w = out.append
@@ -272,6 +338,24 @@ def main():
     w(", ".join(f"{wd}×{n}" for wd, n in top_words) or "—")
     w("")
 
+    w("## Формы под запретом анти-слоя (подсчёт приближённый)")
+    for name, (count, examples) in forms.items():
+        threshold = SOFTENING_THRESHOLD_PERCENT.get(name)
+        if name == COPULAR_FORM:
+            rule = "запрет без исключений"
+        elif threshold is None:
+            rule = "порога нет, подсчёт шумный, решение только по примерам"
+        else:
+            rule = f"порог {threshold}% и минимум {MIN_SAMPLES_WITH_FORM} образца"
+        w(f"- {name.capitalize()}: {count} из {total_samples} образцов ({pct(count, total_samples)}), {rule}")
+        for example in examples:
+            w(f"  - «{example}»")
+    if total_samples < MIN_CORPUS_FOR_SOFTENING:
+        w(f"- Образцов меньше {MIN_CORPUS_FOR_SOFTENING}: выборка мала, смягчение запретов не рекомендуется.")
+    w("- Числа найдены регулярными выражениями, «Не X. Y.» не считается. "
+      "Перед смягчением запрета проверить примеры.")
+    w("")
+
     w("## Подсказки для генерации скилла")
     if avg_len < 200:
         w("- Короткий формат доминирует → основной канал «чат/реплики».")
@@ -297,6 +381,10 @@ def main():
         w("- Автор обычно НЕ ставит точку в конце → не заканчивать тексты «причёсанной» точкой.")
     if em_dash > total_samples:
         w("- Автор САМ активно использует тире → не баним тире жёстко, только защищаем от AI-накопления.")
+    for name, (count, _) in forms.items():
+        if should_soften(name, count, total_samples):
+            w(f"- Автор САМ использует форму «{name}» ({pct(count, total_samples)} образцов) → "
+              "не баним её жёстко, только защищаем от AI-накопления.")
     print("\n".join(out))
 
 
