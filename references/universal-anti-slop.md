@@ -72,16 +72,20 @@
 - «вот о чём никто не говорит», «чего вам не расскажут»
 - всё со словами «никто» и «мало кто понимает».
 
-**ГЛАВНЫЙ (фатальный) паттерн:**
-- «Это не X. Это Y.» и ВСЕ вариации.
-- «Не X. Y.», «Забудь X. Это Y.», «Меньше X, больше Y.»
-- «Не потому что X. А потому что Y.»
-- ЛЮБОЕ предложение, которое отрицает одну рамку и утверждает исправленную.
+**ГЛАВНЫЙ (фатальный) паттерн — связочная антитеза:**
+- «Это не X, а Y», «Это не X. Это Y.», «X — не A, а B», «Это не просто X — это Y».
 - Если появилась хоть одна такая конструкция — текст провален. Удали отрицание,
-  скажи позитив напрямую.
+  скажи позитив напрямую. Корпус автора этот запрет не снимает.
+
+**Запрет по умолчанию, с исключением по корпусу:**
+- Остальная антитеза: «не A, а B» вне связки, «Не X. Y.», «Забудь X. Это Y.»,
+  «Меньше X, больше Y.», «Не потому что X. А потому что Y.» — скажи позитив напрямую.
+- Стрелки (→) как структура — пиши предложением.
+- Пассив: «было сделано», «отмечается» — кто конкретно что сделал.
+- (Исключение: если при сборке запрет на форму смягчён по корпусу автора —
+  тогда не баним её, только защищаем от AI-накопления подряд, см. профиль.)
 
 **Прочие AI-признаки (ноль терпимости):**
-- Стрелки (→) как структура — пиши предложением.
 - «Итак:» / «Знакомьтесь:» как драматичный ввод — вводи естественно.
 - «остановило меня» / «зацепило с первой строки» — просто дай инсайт.
 - «Самое интересное? [пейофф]» / «Хочешь доступ?» — скажи прямо.
@@ -89,7 +93,6 @@
 - Правило трёх («скорость, качество, надёжность») — два пункта или один.
 - Пустые усилители: «реально», «буквально», «по-настоящему», «очевидно».
 - Ложная агентность: «данные говорят», «рынок вознаграждает» — назови актора.
-- Пассив: «было сделано», «отмечается» — кто конкретно что сделал.
 
 ---
 
@@ -134,11 +137,16 @@ including possessive stacking ("Your content, your products, your audience"). Co
 
 **Generic insider claims:** "Here's the part nobody's talking about", "What nobody tells you", anything with "nobody".
 
-**THE BIG ONE (FATAL):** "This isn't X. This is Y." and ALL variations — "Not X. Y.",
-"Forget X. This is Y.", "Less X, more Y.", "Not because of X. But because of Y." Any sentence that
-negates one framing then asserts a corrected one. One occurrence = the output fails. Just state the positive.
+**THE BIG ONE (FATAL), the copular antithesis:** "This isn't X, it's Y", "This isn't X. This is Y.",
+"X isn't A, it's B", "This isn't just X, it's Y". One occurrence = the output fails, and the author's
+corpus does not lift this ban. Just state the positive.
 
-**Other tells (zero tolerance):** arrow (→) as structure, "Enter:" as dramatic intro,
+**Banned by default, with a corpus exception:** other antithesis ("not A but B" outside the copular form,
+"Not X. Y.", "Forget X. This is Y.", "Less X, more Y.", "Not because of X. But because of Y."),
+arrow (→) as structure, passive voice. (Exception: if a form's ban was softened from the author's corpus
+at build time, don't ban it, only guard against AI pile-ups in a row — see profile.)
+
+**Other tells (zero tolerance):** "Enter:" as dramatic intro,
 "Stopped in my tracks", "The best part? [payoff]" / "Want access?", "X changed everything",
 rule-of-three triplets, empty intensifiers (really/literally/genuinely/just/actually),
-false agency ("the data tells us"), passive voice.
+false agency ("the data tells us").
