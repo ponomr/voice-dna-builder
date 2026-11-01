@@ -66,9 +66,7 @@ these those it its as by from he she they we you i me my your our their his her 
 not no do does did have has had will would can could should may might must just so
 """.split())
 
-# Формы анти-слоя (см. references/universal-anti-slop.md). Подсчёт приближённый:
-# регулярка находит кандидатов, решение принимает агент при сборке по примерам.
-# «Не X. Y.» регуляркой не отличить от обычных предложений, поэтому она не считается.
+# Формы анти-слоя (см. references/universal-anti-slop.md).
 COPULAR_ANTITHESIS_RE = re.compile(
     r"(?<!\w)это\s+не\s+(?:просто\s+)?[^.!?…\n]{1,60}?"
     r"(?:,\s*а(?!\w)|\s*[,—–-]\s*это(?!\w)|[.!?…]\s+это(?!\w))"
@@ -97,9 +95,8 @@ PASSIVE_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Порог смягчения запрета: доля образцов с формой, в процентах. None = без рекомендации:
-# регулярка на пассив цепляет и обычные «была работа», «было важно».
-SOFTENING_THRESHOLDS = {"общая антитеза": 10, "стрелки": 30, "пассив": None}
+COPULAR_FORM = "связочная антитеза"
+SOFTENING_THRESHOLD_PERCENT = {"общая антитеза": 10, "стрелки": 30, "пассив": None}
 MIN_SAMPLES_WITH_FORM = 2
 MIN_CORPUS_FOR_SOFTENING = 5
 
@@ -197,32 +194,26 @@ def classify_ending(sample):
 
 def anti_slop_forms(samples):
     """Для каждой формы анти-слоя: число образцов с ней и до трёх примеров."""
-    forms = {
-        "связочная антитеза": [0, []],
-        "общая антитеза": [0, []],
-        "стрелки": [0, []],
-        "пассив": [0, []],
-    }
+    forms = {name: [0, []] for name in (COPULAR_FORM, *SOFTENING_THRESHOLD_PERCENT)}
 
     def record(name, sample, regex):
-        # С контекстом вокруг совпадения: одна стрелка без него ничего не показывает.
-        matches = [" ".join(sample[max(0, m.start() - 30):m.end() + 30].split())
+        matches =[" ".join(sample[max(0, m.start() - 30):m.end() + 30].split())
                    for m in regex.finditer(sample)]
         if matches:
             forms[name][0] += 1
             forms[name][1].extend(matches[:3 - len(forms[name][1])])
 
     for s in samples:
-        record("связочная антитеза", s, COPULAR_ANTITHESIS_RE)
-        # Связка входит и в общий шаблон, поэтому общая форма считается без неё.
-        record("общая антитеза", COPULAR_ANTITHESIS_RE.sub(" ", s), GENERAL_ANTITHESIS_RE)
+        record(COPULAR_FORM, s, COPULAR_ANTITHESIS_RE)
+        without_copular = COPULAR_ANTITHESIS_RE.sub(" ", s)
+        record("общая антитеза", without_copular, GENERAL_ANTITHESIS_RE)
         record("стрелки", s, ARROW_RE)
         record("пассив", s, PASSIVE_RE)
     return forms
 
 
 def should_soften(name, count, total_samples):
-    threshold = SOFTENING_THRESHOLDS.get(name)
+    threshold = SOFTENING_THRESHOLD_PERCENT.get(name)
     return (
         threshold is not None
         and total_samples >= MIN_CORPUS_FOR_SOFTENING
@@ -349,8 +340,8 @@ def main():
 
     w("## Формы под запретом анти-слоя (подсчёт приближённый)")
     for name, (count, examples) in forms.items():
-        threshold = SOFTENING_THRESHOLDS.get(name)
-        if name == "связочная антитеза":
+        threshold = SOFTENING_THRESHOLD_PERCENT.get(name)
+        if name == COPULAR_FORM:
             rule = "запрет без исключений"
         elif threshold is None:
             rule = "порога нет, подсчёт шумный, решение только по примерам"
